@@ -41,7 +41,7 @@ def add_application_to_yonote(full_name: str, telegram_id: int, age: Optional[st
 
     # Подготавливаем данные
     data = {
-        "parentDocumentId": settings.yonote_database_id,
+        "databaseId": settings.yonote_database_id,
         "title": full_name,
         "values": {
             TELEGRAM_ID_FIELD: telegram_id
