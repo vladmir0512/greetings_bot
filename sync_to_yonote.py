@@ -15,9 +15,12 @@ for row in rows:
     answers = json.loads(row["answers_json"])
     full_name = row["full_name"] or ""
     telegram_id = row["user_id"]
-    birthday = answers.get("birthday", "")  # Предполагаем, что в answers есть birthday
+    age = answers.get("age", "")
+    time = answers.get("time", "")
+    experience = answers.get("experience", "")
+    goals = answers.get("goals", "")
 
-    success = add_application_to_yonote(full_name, telegram_id, birthday)
+    success = add_application_to_yonote(full_name, telegram_id, age, time, experience, goals)
     if success:
         repo.mark_synced(row["id"])
         print(f"Заявка {row['id']} ({full_name}) синхронизирована в Yonote")

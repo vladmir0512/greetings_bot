@@ -225,9 +225,12 @@ async def process_approval(row, query, context: ContextTypes.DEFAULT_TYPE) -> No
     answers = json.loads(row["answers_json"])
     full_name = row["full_name"] or ""
     telegram_id = row["user_id"]
-    birthday = answers.get("birthday", "")  # Если добавим в опрос
+    age = answers.get("age", "")
+    time = answers.get("time", "")
+    experience = answers.get("experience", "")
+    goals = answers.get("goals", "")
 
-    synced = add_application_to_yonote(full_name, telegram_id, birthday)
+    synced = add_application_to_yonote(full_name, telegram_id, age, time, experience, goals)
     if synced:
         repo.mark_synced(row["id"])
 
