@@ -33,7 +33,7 @@ def add_application_to_yonote(full_name: str, telegram_id: int, age: Optional[st
         print("Yonote API key или database ID не настроены")
         return False
 
-    url = f"{YONOTE_BASE_URL}/database/rows"
+    url = f"{YONOTE_BASE_URL}/documents/{settings.yonote_database_id}/rows"
     headers = {
         "Authorization": f"Bearer {settings.yonote_api_key}",
         "Content-Type": "application/json"
@@ -41,7 +41,6 @@ def add_application_to_yonote(full_name: str, telegram_id: int, age: Optional[st
 
     # Подготавливаем данные
     data = {
-        "documentId": settings.yonote_database_id,
         "title": full_name,
         "values": {
             TELEGRAM_ID_FIELD: telegram_id
