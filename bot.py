@@ -15,7 +15,7 @@ from telegram.ext import (
 
 from config import settings
 from db import ApplicationRepository
-from google_client import SheetsClient
+from yonote_client import add_application_to_yonote
 
 
 logging.basicConfig(
@@ -59,7 +59,6 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
 )
 
 repo = ApplicationRepository(settings.database_path)
-sheets_client = SheetsClient(settings.google_credentials_file, settings.google_sheet_id)
 
 
 def is_admin(user_id: int) -> bool:
@@ -217,23 +216,18 @@ async def handle_admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def process_approval(row, query, context: ContextTypes.DEFAULT_TYPE) -> None:
-    synced_flag = row["synced_to_sheet"] if "synced_to_sheet" in row.keys() else 0
+    synced_flag = row["synced_to_yonote"] if "synced_to_yonote" in row.keys() else 0
     if synced_flag:
         await query.edit_message_text(f"{format_application(row)}\n\n✅ Уже выгружено.")
         return
 
     repo.update_status(row["id"], "approved")
     answers = json.loads(row["answers_json"])
-    payload = {
-        "ID": str(row["user_id"]),
-        "Имя": row["full_name"] or "",
-        "Username": f"@{row['username']}" if row["username"] else "",
-        "Город": answers.get("city", ""),
-        "Опыт": answers.get("experience", ""),
-        "Цель": answers.get("goals", ""),
-    }
+    full_name = row["full_name"] or ""
+    telegram_id = row["user_id"]
+    birthday = answers.get("birthday", "")  # Если добавим в опрос
 
-    synced = sheets_client.append_application(payload)
+    synced = add_application_to_yonote(full_name, telegram_id, birthday)
     if synced:
         repo.mark_synced(row["id"])
 

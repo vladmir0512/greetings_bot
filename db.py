@@ -29,7 +29,7 @@ class ApplicationRepository:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     admin_comment TEXT,
-                    synced_to_sheet INTEGER DEFAULT 0
+                    synced_to_yonote INTEGER DEFAULT 0
                 );
                 """
             )
@@ -38,9 +38,9 @@ class ApplicationRepository:
                 row["name"]
                 for row in self._conn.execute("PRAGMA table_info(applications)")
             }
-            if "synced_to_sheet" not in columns:
+            if "synced_to_yonote" not in columns:
                 self._conn.execute(
-                    "ALTER TABLE applications ADD COLUMN synced_to_sheet INTEGER DEFAULT 0"
+                    "ALTER TABLE applications ADD COLUMN synced_to_yonote INTEGER DEFAULT 0"
                 )
             self._conn.commit()
     def list_all(self) -> List[sqlite3.Row]:
@@ -128,7 +128,7 @@ class ApplicationRepository:
             self._conn.execute(
                 """
                 UPDATE applications
-                SET synced_to_sheet = 1, updated_at = CURRENT_TIMESTAMP
+                SET synced_to_yonote = 1, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 """,
                 (app_id,),
