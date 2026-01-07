@@ -15,7 +15,7 @@ from telegram.ext import (
 
 from config import settings
 from db import ApplicationRepository
-from yonote_client import add_application_to_yonote
+from yonote_client import create_document
 
 
 logging.basicConfig(
@@ -25,13 +25,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 ASKING = 1
+JOB_SELECTION = 2
 
 SURVEY = [
-    ("full_name", "Как вас зовут?"),
-    ("age", "Сколько вам лет?"),
-    ("time", "Сколько времени готовы уделять работе в команде?"),
-    ("experience", "Напишите ссылку на примеры работ."),
-    ("goals", "Зачем хотите вступить в комьюнити и чем можете помочь?"),
+    ("full_name", " Как к Вам обращаться? [пример: Star123] (ник, имя, прозвищe)"),
+    ("age", "Сколько Вам полных лет? [пример: 18]"),
+    ("job", "На какую должность претендуете? (по нажатию кнопки)"),
+    ("experience", "Стаж в направлении. [пример: 2 дня/месяца/года/жизни]"),
+    ("portfolio", "Ссылки на ваши работы [пример: мой гит http://github.com/vladmir0512 , мой работы http://example.com/ ]"),
+    ("goals", "Цель вступления в проект? Кратко. [пример: я вокалист и хочу научиться работать в команде]"),
 ]
 
 WELCOME_TEXT = (
@@ -42,11 +44,12 @@ SUCCESS_TEXT = (
 )
 APPROVE_TEMPLATE = (
     "Привет, {name}! Ваша заявка одобрена 🎉\n"
-    "Вот ссылка для вступления: {invite_link}\n"
-    "До встречи в чатах!"
+    "Ожидайте, в ближайшее время с Вами свяжутся администраторы.\n"
+    "Проверьте, что у Вас не закрыты личные сообщения!\n"
+    "До встречи!"
 )
 DECLINE_TEMPLATE = (
-    "Привет, {name}! Спасибо за интерес, но сейчас мы не можем принять вашу заявку. "
+    "Привет, {name}! Спасибо за интерес, но сейчас мы не можем принять Вашу заявку. "
     "Можете подать её повторно позже."
 )
 
@@ -116,7 +119,43 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         logger.info("Сохранена заявка %s от пользователя %s", application_id, user.id)
         return ConversationHandler.END
     context.user_data["survey_step"] = idx
+    if idx == 2:  # job selection
+        jobs = ["Вокалист", "Переводчик", "Звукарь", "Видер", "Художник", "Программист", "Менеджер"]
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(job, callback_data=f"job:{job}") for job in jobs[i:i+3]]
+            for i in range(0, len(jobs), 3)
+        ])
+        await update.message.reply_text(SURVEY[idx][1], reply_markup=keyboard)
+        return JOB_SELECTION
     await update.message.reply_text(SURVEY[idx][1])
+    return ASKING
+
+
+async def handle_job_selection(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    choice = query.data.split(":", 1)[1]
+    idx = context.user_data.get("survey_step", 2)
+    answers: Dict[str, str] = context.user_data.get("answers", {})
+    field, _ = SURVEY[idx]
+    answers[field] = choice
+    context.user_data["answers"] = answers
+    idx += 1
+    if idx >= len(SURVEY):
+        user = query.from_user
+        chat = query.message.chat
+        application_id = repo.save_application(
+            user_id=user.id,
+            chat_id=chat.id,
+            username=user.username,
+            full_name=answers.get("full_name") or user.full_name,
+            answers=answers,
+        )
+        await query.edit_message_text(SUCCESS_TEXT)
+        logger.info("Сохранена заявка %s от пользователя %s", application_id, user.id)
+        return ConversationHandler.END
+    context.user_data["survey_step"] = idx
+    await query.edit_message_text(SURVEY[idx][1])
     return ASKING
 
 
@@ -226,23 +265,26 @@ async def process_approval(row, query, context: ContextTypes.DEFAULT_TYPE) -> No
     full_name = row["full_name"] or ""
     telegram_id = row["user_id"]
     age = answers.get("age", "")
-    time = answers.get("time", "")
-    experience = answers.get("experience", "")
+    experience = answers.get("experience", "")  # Стаж
+    portfolio = answers.get("portfolio", "")  # Ссылки
     goals = answers.get("goals", "")
+    job = answers.get("job", "")  # Должность
 
-    synced = add_application_to_yonote(full_name, telegram_id, age, time, experience, goals)
+    title = f"Заявка от {full_name}"
+    doc = create_document(full_name, age, job, experience, portfolio, goals, title)
+    synced = doc is not None
     if synced:
         repo.mark_synced(row["id"])
 
-    invite = settings.community_invite_link or "Ссылка будет отправлена позже."
-    text = APPROVE_TEMPLATE.format(name=row["full_name"] or "друг", invite_link=invite)
+    text = APPROVE_TEMPLATE.format(name=row["full_name"] or "друг")
     await notify_user(row["chat_id"], text, context)
 
-    status_note = "✅ Одобрено и выгружено." if synced else "✅ Одобрено, но выгрузка не удалась."
+    status_note = "✅ Одобрено и документ создан." if synced else "✅ Одобрено, но создание документа не удалось."
     history_text = format_history(row["user_id"])
     await query.edit_message_text(
         f"{format_application(row)}\n\n{status_note}\n\nИстория заявок:\n{history_text}"
     )
+
 
 async def process_decline(row, query, context: ContextTypes.DEFAULT_TYPE) -> None:
     repo.update_status(row["id"], "declined")
@@ -271,6 +313,9 @@ def build_application() -> Application:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_answer),
                 CommandHandler("cancel", cancel),
             ],
+            JOB_SELECTION: [
+                CallbackQueryHandler(handle_job_selection, pattern=r"^job:"),
+            ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
@@ -279,7 +324,7 @@ def build_application() -> Application:
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CommandHandler("cancel", cancel))
-    application.add_handler(CallbackQueryHandler(handle_admin_action))
+    application.add_handler(CallbackQueryHandler(handle_admin_action, pattern=r"^(approve|decline):"))
     return application
 
 
@@ -291,4 +336,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

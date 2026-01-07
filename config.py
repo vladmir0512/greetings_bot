@@ -23,8 +23,6 @@ class Settings:
         default_factory=lambda: Path(os.environ.get("DATABASE_PATH", "data/applications.db"))
     )
     admin_ids: List[int] = field(default_factory=lambda: _split_env_list(os.environ.get("ADMIN_IDS")))
-    google_credentials_file: str | None = field(default_factory=lambda: os.environ.get("GOOGLE_CREDENTIALS_FILE"))
-    google_sheet_id: str | None = field(default_factory=lambda: os.environ.get("GOOGLE_SHEET_ID"))
     community_invite_link: str | None = field(default_factory=lambda: os.environ.get("COMMUNITY_INVITE_LINK"))
     yonote_api_key: str | None = field(default_factory=lambda: os.environ.get("YONOTE_API_KEY"))
     yonote_database_id: str | None = field(default_factory=lambda: os.environ.get("YONOTE_DATABASE_ID"))

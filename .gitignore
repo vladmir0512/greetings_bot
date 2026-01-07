@@ -46,8 +46,7 @@ ENV/
 data/
 
 # Google Service Account
-service_account.json
-*-service-account.json
+*.json
 
 # Logs
 *.log
