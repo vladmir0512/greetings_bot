@@ -270,7 +270,7 @@ async def process_approval(row, query, context: ContextTypes.DEFAULT_TYPE) -> No
     goals = answers.get("goals", "")
     job = answers.get("job", "")  # Должность
 
-    title = f"Заявка от {full_name}"
+    title = f"Заявка от {job}а"
     doc = create_document(full_name, age, job, experience, portfolio, goals, title)
     synced = doc is not None
     if synced:
