@@ -2,77 +2,91 @@ import unittest
 import sqlite3
 import os
 import sys
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # Добавляем путь к основному коду
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from db import init_db, add_application, get_pending_applications, update_application_status
+from db import ApplicationRepository
 
 class TestDatabase(unittest.TestCase):
     """Тесты для работы с базой данных"""
 
     def setUp(self):
         """Создание временной базы данных для тестов"""
-        self.test_db = ':memory:'  # Используем in-memory базу для тестов
-        self.connection = sqlite3.connect(self.test_db)
+        self.test_db_path = Path(':memory:')  # Используем in-memory базу для тестов
+        self.repo = ApplicationRepository(self.test_db_path)
         
     def tearDown(self):
         """Закрытие подключения к базе данных"""
-        self.connection.close()
+        # For in-memory, no need to close explicitly, but ensure
+        pass
 
-    @patch('sqlite3.connect')
-    def test_init_db(self, mock_connect):
-        """Тест инициализации базы данных"""
-        mock_connect.return_value = self.connection
-        
-        init_db()
-        
-        # Проверяем, что таблица создана
-        cursor = self.connection.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='applications'")
-        self.assertIsNotNone(cursor.fetchone())
-
-    @patch('sqlite3.connect')
-    def test_add_application(self, mock_connect):
+    def test_save_application(self):
         """Тест добавления заявки"""
-        mock_connect.return_value = self.connection
-        init_db()  # Инициализируем базу перед тестом
-        
         # Добавляем тестовую заявку
         user_id = 123456789
-        name = "Test User"
+        chat_id = 123456
         username = "testuser"
-        city = "Test City"
-        experience = "None"
-        goal = "Testing"
+        full_name = "Test User"
+        answers = {"city": "Test City", "experience": "None", "goal": "Testing"}
         
-        add_application(user_id, name, username, city, experience, goal)
+        app_id = self.repo.save_application(user_id, chat_id, username, full_name, answers)
         
         # Проверяем, что заявка добавлена
-        cursor = self.connection.cursor()
-        cursor.execute("SELECT * FROM applications WHERE user_id = ?", (user_id,))
-        result = cursor.fetchone()
+        app = self.repo.get_by_id(app_id)
         
-        self.assertIsNotNone(result)
-        self.assertEqual(result[1], user_id)
-        self.assertEqual(result[2], name)
-        self.assertEqual(result[3], username)
+        self.assertIsNotNone(app)
+        self.assertEqual(app['user_id'], user_id)
+        self.assertEqual(app['chat_id'], chat_id)
+        self.assertEqual(app['username'], username)
+        self.assertEqual(app['full_name'], full_name)
+        self.assertEqual(app['status'], 'pending')
 
-    @patch('sqlite3.connect')
-    def test_get_pending_applications(self, mock_connect):
+    def test_list_pending_applications(self):
         """Тест получения заявок на рассмотрение"""
-        mock_connect.return_value = self.connection
-        init_db()
-        
         # Добавляем тестовую заявку
-        add_application(123456789, "Test User", "testuser", "Test City", "None", "Testing")
+        answers = {"city": "Test City", "experience": "None", "goal": "Testing"}
+        self.repo.save_application(123456789, 123456, "testuser", "Test User", answers)
         
         # Получаем заявки на рассмотрение
-        applications = get_pending_applications()
+        applications = self.repo.list_pending()
         
         self.assertEqual(len(applications), 1)
-        self.assertEqual(applications[0][2], "Test User")
+        self.assertEqual(applications[0]['full_name'], "Test User")
+        self.assertEqual(applications[0]['status'], 'pending')
+
+    def test_update_status(self):
+        """Тест обновления статуса заявки"""
+        answers = {"city": "Test City"}
+        app_id = self.repo.save_application(123456789, 123456, "testuser", "Test User", answers)
+        
+        self.repo.update_status(app_id, 'approved', 'Approved by admin')
+        
+        app = self.repo.get_by_id(app_id)
+        self.assertEqual(app['status'], 'approved')
+        self.assertEqual(app['admin_comment'], 'Approved by admin')
+
+    def test_list_all(self):
+        """Тест получения всех заявок"""
+        answers = {"city": "Test City"}
+        self.repo.save_application(123456789, 123456, "testuser", "Test User", answers)
+        
+        applications = self.repo.list_all()
+        
+        self.assertEqual(len(applications), 1)
+        self.assertEqual(applications[0]['full_name'], "Test User")
+
+    def test_get_last_for_user(self):
+        """Тест получения последней заявки пользователя"""
+        answers = {"city": "Test City"}
+        self.repo.save_application(123456789, 123456, "testuser", "Test User", answers)
+        
+        app = self.repo.get_last_for_user(123456789)
+        
+        self.assertIsNotNone(app)
+        self.assertEqual(app['user_id'], 123456789)
 
 if __name__ == '__main__':
     unittest.main()
