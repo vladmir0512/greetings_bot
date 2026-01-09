@@ -8,7 +8,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 def _split_env_list(value: str | None) -> List[int]:
     if not value:
         return []
@@ -18,14 +17,14 @@ def _split_env_list(value: str | None) -> List[int]:
 
 @dataclass(slots=True)
 class Settings:
-    bot_token: str = field(default_factory=lambda: os.environ.get("BOT_TOKEN", ""))
+    bot_token: str = field(default_factory=lambda: os.environ.get("TELEGRAM_BOT_TOKEN", ""))
     database_path: Path = field(
         default_factory=lambda: Path(os.environ.get("DATABASE_PATH", "data/applications.db"))
     )
     admin_ids: List[int] = field(default_factory=lambda: _split_env_list(os.environ.get("ADMIN_IDS")))
-    community_invite_link: str | None = field(default_factory=lambda: os.environ.get("COMMUNITY_INVITE_LINK"))
     yonote_api_key: str | None = field(default_factory=lambda: os.environ.get("YONOTE_API_KEY"))
-    yonote_database_id: str | None = field(default_factory=lambda: os.environ.get("YONOTE_DATABASE_ID"))
+    yonote_collection_id: str | None = field(default_factory=lambda: os.environ.get("YONOTE_COLLECTION_ID"))
+    yonote_base_url: str | None = field(default_factory=lambda: os.environ.get("YONOTE_BASE_URL"))
 
     def validate(self) -> None:
         if not self.bot_token:

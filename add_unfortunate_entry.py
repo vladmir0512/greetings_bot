@@ -4,7 +4,7 @@ import logging
 # Настройки
 BASE_URL = "https://app.yonote.ru/api"
 TOKEN = "I2xRjznMsl5NnGwL3Sez2vruQrTJPxIlywCMrv"
-COLLECTION_ID = "1196a54b-fe1b-497f-8f63-d87e86f74bf4"
+COLLECTION_ID = "646bf24c-bb56-4649-b290-2d11a0360cc8"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -74,10 +74,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if last_application:
         status = last_application["status"]
         if status == "approved":
-            invite = settings.community_invite_link or "Ссылка на вступление уже была отправлена."
             await update.message.reply_text(
-                "Ваша предыдущая заявка уже одобрена. Вот актуальная ссылка:\n"
-                f"{invite}",
+                "Ваша предыдущая заявка уже одобрена.",
                 reply_markup=MAIN_KEYBOARD,
             )
             return ConversationHandler.END
@@ -115,6 +113,18 @@ async def handle_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
             full_name=answers.get("full_name") or user.full_name,
             answers=answers,
         )
+        # Create document in Yonote upon submission
+        full_name_doc = answers.get("full_name") or user.full_name
+        username = user.username or ""
+        age = answers.get("age", "")
+        job = answers.get("job", "")
+        experience = answers.get("experience", "")
+        portfolio = answers.get("portfolio", "")
+        goals = answers.get("goals", "")
+        title = f"Заявка от {job}а"
+        doc = create_document(full_name_doc, age, job, experience, portfolio, goals, username, title)
+        if doc is not None:
+            repo.mark_synced(application_id)
         await update.message.reply_text(SUCCESS_TEXT)
         logger.info("Сохранена заявка %s от пользователя %s", application_id, user.id)
         return ConversationHandler.END
@@ -151,6 +161,18 @@ async def handle_job_selection(update: Update, context: ContextTypes.DEFAULT_TYP
             full_name=answers.get("full_name") or user.full_name,
             answers=answers,
         )
+        # Create document in Yonote upon submission
+        full_name_doc = answers.get("full_name") or user.full_name
+        username = user.username or ""
+        age = answers.get("age", "")
+        job = answers.get("job", "")
+        experience = answers.get("experience", "")
+        portfolio = answers.get("portfolio", "")
+        goals = answers.get("goals", "")
+        title = f"Заявка от {job}а"
+        doc = create_document(full_name_doc, age, job, experience, portfolio, goals, username, title)
+        if doc is not None:
+            repo.mark_synced(application_id)
         await query.edit_message_text(SUCCESS_TEXT)
         logger.info("Сохранена заявка %s от пользователя %s", application_id, user.id)
         return ConversationHandler.END
@@ -255,34 +277,13 @@ async def handle_admin_action(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def process_approval(row, query, context: ContextTypes.DEFAULT_TYPE) -> None:
-    synced_flag = row["synced_to_yonote"] if "synced_to_yonote" in row.keys() else 0
-    if synced_flag:
-        await query.edit_message_text(f"{format_application(row)}\n\n✅ Уже выгружено.")
-        return
-
     repo.update_status(row["id"], "approved")
-    answers = json.loads(row["answers_json"])
-    full_name = row["full_name"] or ""
-    telegram_id = row["user_id"]
-    age = answers.get("age", "")
-    experience = answers.get("experience", "")  # Стаж
-    portfolio = answers.get("portfolio", "")  # Ссылки
-    goals = answers.get("goals", "")
-    job = answers.get("job", "")  # Должность
-
-    title = f"Заявка от {job}а"
-    doc = create_document(full_name, age, job, experience, portfolio, goals, title)
-    synced = doc is not None
-    if synced:
-        repo.mark_synced(row["id"])
-
     text = APPROVE_TEMPLATE.format(name=row["full_name"] or "друг")
     await notify_user(row["chat_id"], text, context)
 
-    status_note = "✅ Одобрено и документ создан." if synced else "✅ Одобрено, но создание документа не удалось."
     history_text = format_history(row["user_id"])
     await query.edit_message_text(
-        f"{format_application(row)}\n\n{status_note}\n\nИстория заявок:\n{history_text}"
+        f"{format_application(row)}\n\n✅ Одобрено.\n\nИстория заявок:\n{history_text}"
     )
 
 
