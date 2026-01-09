@@ -17,7 +17,7 @@ def _split_env_list(value: str | None) -> List[int]:
     return [int(item) for item in raw_values if item.isdigit()]
 
 
-@dataclass(slots=True)
+@dataclass
 class Settings:
     bot_token: str = field(default_factory=lambda: os.environ.get("TELEGRAM_BOT_TOKEN", ""))
     database_path: Path = field(
